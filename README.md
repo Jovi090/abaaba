@@ -583,5 +583,192 @@ public class TradeListDisplay {
     }
 }
 
+change 444444444444444444444444444444
+package trading;
+
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Scanner;
+
+public class TradeEntry {
+
+    private static final String TRADE_CSV_FILE_PATH = "C:/Users/qqq/Desktop/Trade.csv";
+    private static final String STOCK_CSV_FILE_PATH = "C:/Users/qqq/Desktop/Stock.csv";
+    private static final DateTimeFormatter DATETIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
+    public static void recordTrade() {
+        Scanner scanner = new Scanner(System.in);
+
+        // 1. 取引日時の入力
+        LocalDateTime tradedDatetime;
+        while (true) {
+            System.out.print("取引日時を入力してください (yyyy-MM-dd HH:mm): ");
+            String tradedDatetimeStr = scanner.nextLine().trim();
+            try {
+                tradedDatetime = LocalDateTime.parse(tradedDatetimeStr, DATETIME_FORMATTER);
+                if (isValidTradeDatetime(tradedDatetime)) {
+                    break;
+                } else {
+                    System.out.println("無効な取引日時です。再度入力してください。");
+                }
+            } catch (Exception e) {
+                System.out.println("日時の形式が無効です。再度入力してください。");
+            }
+        }
+
+        // 2. 銘柄コードの入力
+        String ticker;
+        while (true) {
+            System.out.print("銘柄コードを入力してください (4桁の半角英数字): ");
+            ticker = scanner.nextLine().trim().toUpperCase();
+            if (!isValidTicker(ticker)) {
+                System.out.println("無効な銘柄コードです。再度入力してください。");
+            } else if (!isTickerRegistered(ticker)) {
+                System.out.println("指定された銘柄は銘柄マスタに登録されていません。");
+            } else {
+                break;
+            }
+        }
+
+        // 3. 売買区分の入力
+        String side;
+        while (true) {
+            System.out.print("売買区分を入力してください (Buy/Sell): ");
+            side = scanner.nextLine().trim();
+            if (isValidSide(side)) {
+                break;
+            } else {
+                System.out.println("無効な売買区分です。再度入力してください。");
+            }
+        }
+
+        // 4. 数量の入力
+        int quantity;
+        while (true) {
+            System.out.print("数量を入力してください (100株単位): ");
+            try {
+                quantity = Integer.parseInt(scanner.nextLine().trim());
+                if (isValidQuantity(quantity)) {
+                    break;
+                } else {
+                    System.out.println("無効な数量です。再度入力してください。");
+                }
+            } catch (NumberFormatException e) {
+                System.out.println("数値として認識できません。再度入力してください。");
+            }
+        }
+
+        // 5. 取引単価の入力
+        BigDecimal tradedUnitPrice;
+        while (true) {
+            System.out.print("取引単価を入力してください (小数点以下2桁まで): ");
+            try {
+                tradedUnitPrice = new BigDecimal(scanner.nextLine().trim());
+                if (isValidUnitPrice(tradedUnitPrice)) {
+                    break;
+                } else {
+                    System.out.println("無効な取引単価です。再度入力してください。");
+                }
+            } catch (NumberFormatException e) {
+                System.out.println("数値として認識できません。再度入力してください。");
+            }
+        }
+
+        LocalDateTime inputDatetime = LocalDateTime.now();
+        Trade trade = new Trade(tradedDatetime, ticker, side, quantity, tradedUnitPrice, inputDatetime);
+
+        // 6. 取引データのCSVへの書き込み
+        try (FileWriter writer = new FileWriter(TRADE_CSV_FILE_PATH, true)) {
+            writer.write(trade.toCSVFormat() + "\n");
+            System.out.println("取引データを新規登録しました。");
+        } catch (IOException e) {
+            System.out.println("CSVファイルへの書き込み中にエラーが発生しました: " + e.getMessage());
+        }
+
+        // 7. 銘柄マスタのShares Issuedを更新
+        updateStockMaster(ticker, quantity, side);
+    }
+
+    // 銘柄マスタのShares Issuedを更新
+    private static void updateStockMaster(String ticker, int quantity, String side) {
+        List<String[]> stockData = new ArrayList<>();
+
+        try (BufferedReader br = new BufferedReader(new FileReader(STOCK_CSV_FILE_PATH))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                String[] values = line.split(",");
+                if (values[0].equals(ticker)) {
+                    long sharesIssued = Long.parseLong(values[3]);
+                    if (side.equalsIgnoreCase("Buy")) {
+                        sharesIssued += quantity; // 買入時は株式数を増やす
+                    } else if (side.equalsIgnoreCase("Sell")) {
+                        sharesIssued -= quantity; // 売却時は株式数を減らす
+                    }
+                    values[3] = String.valueOf(sharesIssued);
+                }
+                stockData.add(values);
+            }
+        } catch (IOException e) {
+            System.out.println("銘柄マスタの読み込み中にエラーが発生しました: " + e.getMessage());
+        }
+
+        // 更新された銘柄マスタをファイルに書き戻す
+        try (FileWriter writer = new FileWriter(STOCK_CSV_FILE_PATH, false)) {
+            for (String[] stock : stockData) {
+                writer.write(String.join(",", stock) + "\n");
+            }
+        } catch (IOException e) {
+            System.out.println("銘柄マスタの書き込み中にエラーが発生しました: " + e.getMessage());
+        }
+    }
+
+    // 銘柄マスタにtickerが存在するか確認する
+    private static boolean isTickerRegistered(String ticker) {
+        try (BufferedReader br = new BufferedReader(new FileReader(STOCK_CSV_FILE_PATH))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                String[] values = line.split(",");
+                if (values[0].equals(ticker)) {
+                    return true;
+                }
+            }
+        } catch (IOException e) {
+            System.out.println("銘柄マスタの読み込み中にエラーが発生しました: " + e.getMessage());
+        }
+        return false;
+    }
+
+    private static boolean isValidTradeDatetime(LocalDateTime tradedDatetime) {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime startOfDay = tradedDatetime.toLocalDate().atTime(9, 0);
+        LocalDateTime endOfDay = tradedDatetime.toLocalDate().atTime(15, 30);
+        return tradedDatetime.isBefore(now) && (tradedDatetime.isEqual(startOfDay) || tradedDatetime.isAfter(startOfDay))
+                && (tradedDatetime.isEqual(endOfDay) || tradedDatetime.isBefore(endOfDay))
+                && tradedDatetime.getDayOfWeek().getValue() <= 5; // 月〜金
+    }
+
+    private static boolean isValidTicker(String ticker) {
+        return ticker.matches("^[0-9][A-Z0-9][0-9][A-Z0-9]$");
+    }
+
+    private static boolean isValidSide(String side) {
+        return side.equalsIgnoreCase("Buy") || side.equalsIgnoreCase("Sell");
+    }
+
+    private static boolean isValidQuantity(int quantity) {
+        return quantity > 0 && quantity % 100 == 0;
+    }
+
+    private static boolean isValidUnitPrice(BigDecimal unitPrice) {
+        return unitPrice.scale() <= 2;
+    }
+}
 
 
