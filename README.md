@@ -771,4 +771,174 @@ public class TradeEntry {
     }
 }
 
+555555555555555555555555555555555555 Collections.sort
+package trading;
 
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+
+public class TradeListDisplay {
+
+    private static final String CSV_FILE_PATH = "C:/Users/qqq/Desktop/Trade.csv";
+    private static final DateTimeFormatter DATETIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+    private static final int DATETIME_WIDTH = 19;   // 取引日時の幅
+    private static final int TICKER_WIDTH = 7;      // 銘柄コードの幅
+    private static final int TICKERNAME_WIDTH = 30; // 銘柄名の幅
+    private static final int SIDE_WIDTH = 4;        // 売買区分の幅
+    private static final int QUANTITY_WIDTH = 10;   // 数量の幅
+    private static final int UNIT_PRICE_WIDTH = 12; // 取引単価の幅
+
+    public void displayTradeList() {
+        List<Trade> tradeData = readTradeData();
+
+        if (tradeData == null || tradeData.isEmpty()) {
+            System.out.println("取引データが存在しません。");
+            return;
+        }
+
+        // 取引日時の降順でソート
+        Collections.sort(tradeData, Comparator.comparing(Trade::tradedDatetime).reversed());
+
+        // ヘッダーを表示
+        printHeader();
+
+        // 各行のデータを表示
+        for (Trade trade : tradeData) {
+            printTradeRow(trade);
+        }
+
+        // 区切り線を表示
+        printSeparator();
+    }
+
+    private List<Trade> readTradeData() {
+        List<Trade> tradeData = new ArrayList<>();
+
+        try (BufferedReader br = new BufferedReader(new FileReader(CSV_FILE_PATH))) {
+            String line;
+            br.readLine(); // ヘッダー行をスキップ
+            while ((line = br.readLine()) != null) {
+                String[] values = line.split(",");
+                if (values.length == 7) { // 取引データのカラム数は7に変更
+                    LocalDateTime tradedDatetime = LocalDateTime.parse(values[0], DATETIME_FORMATTER);
+                    String ticker = values[1];
+                    String tickername = values[2];
+                    String side = values[3];
+                    int quantity = Integer.parseInt(values[4]);
+                    BigDecimal tradedUnitPrice = new BigDecimal(values[5]);
+                    LocalDateTime inputDatetime = LocalDateTime.parse(values[6], DATETIME_FORMATTER);
+                    tradeData.add(new Trade(tradedDatetime, ticker, tickername, side, quantity, tradedUnitPrice, inputDatetime));
+                }
+            }
+        } catch (IOException e) {
+            System.err.println("CSVファイルの読み込み中にエラーが発生しました: " + e.getMessage());
+            return null;
+        }
+
+        return tradeData;
+    }
+
+    private void printHeader() {
+        printSeparator();
+        System.out.printf("| %-"+DATETIME_WIDTH+"s | %-"+TICKER_WIDTH+"s | %-"+TICKERNAME_WIDTH+"s | %-"+SIDE_WIDTH+"s | %-"+QUANTITY_WIDTH+"s | %-"+UNIT_PRICE_WIDTH+"s |%n",
+                "Trade Time", "Ticker", "Product Name", "Side", "Quantity", "Unit Price");
+        printSeparator();
+    }
+
+    private void printTradeRow(Trade trade) {
+        String tickername = trade.tickername();
+        if (tickername.length() > TICKERNAME_WIDTH) {
+            tickername = tickername.substring(0, TICKERNAME_WIDTH - 3) + "...";
+        }
+
+        System.out.printf("| %-"+DATETIME_WIDTH+"s | %-"+TICKER_WIDTH+"s | %-"+TICKERNAME_WIDTH+"s | %-"+SIDE_WIDTH+"s | %"+QUANTITY_WIDTH+"d | %"+UNIT_PRICE_WIDTH+".2f |%n",
+                trade.tradedDatetime().format(DATETIME_FORMATTER),
+                trade.ticker(),
+                tickername,
+                trade.side(),
+                trade.quantity(),
+                trade.tradedUnitPrice());
+    }
+
+    private void printSeparator() {
+        System.out.println("=====================================================================================================");
+    }
+}
+
+nooooooooooooooooooorecord
+
+package trading;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+
+public class Trade {
+    private final LocalDateTime tradedDatetime;
+    private final String ticker;
+    private final String tickername;
+    private final String side;
+    private final int quantity;
+    private final BigDecimal tradedUnitPrice;
+    private final LocalDateTime inputDatetime;
+
+    private static final DateTimeFormatter DATETIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
+    public Trade(LocalDateTime tradedDatetime, String ticker, String tickername, String side, int quantity,
+                 BigDecimal tradedUnitPrice, LocalDateTime inputDatetime) {
+        this.tradedDatetime = tradedDatetime;
+        this.ticker = ticker;
+        this.tickername = tickername;
+        this.side = side;
+        this.quantity = quantity;
+        this.tradedUnitPrice = tradedUnitPrice;
+        this.inputDatetime = inputDatetime;
+    }
+
+    public LocalDateTime getTradedDatetime() {
+        return tradedDatetime;
+    }
+
+    public String getTicker() {
+        return ticker;
+    }
+
+    public String getTickername() {
+        return tickername;
+    }
+
+    public String getSide() {
+        return side;
+    }
+
+    public int getQuantity() {
+        return quantity;
+    }
+
+    public BigDecimal getTradedUnitPrice() {
+        return tradedUnitPrice;
+    }
+
+    public LocalDateTime getInputDatetime() {
+        return inputDatetime;
+    }
+
+    public String toCSVFormat() {
+        return String.join(",",
+                tradedDatetime.format(DATETIME_FORMATTER),
+                ticker,
+                tickername,
+                side,
+                String.valueOf(quantity),
+                tradedUnitPrice.toString(),
+                inputDatetime.format(DATETIME_FORMATTER));
+    }
+}
