@@ -764,3 +764,151 @@ public class TradeView {
 }
 
 
+
+
+
+
+
+package model;
+
+import java.math.BigDecimal;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+
+public class Trade {
+    private LocalDateTime tradedDatetime;  // 交易时间
+    private String ticker;                  // 股票代码
+    private String tickerName;              // 股票名称
+    private String side;                    // 买卖方向（Buy 或 Sell）
+    private int quantity;                   // 交易数量
+    private BigDecimal tradedUnitPrice;     // 交易单价
+    private LocalDateTime inputDatetime;    // 输入时间
+
+    public static final DateTimeFormatter DATETIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
+    // 构造方法
+    public Trade(LocalDateTime tradedDatetime, String ticker, String tickerName, String side, int quantity, BigDecimal tradedUnitPrice, LocalDateTime inputDatetime) {
+        validateTradedDatetime(tradedDatetime); // 验证交易时间
+        this.tradedDatetime = tradedDatetime;
+        this.ticker = ticker;
+        this.tickerName = tickerName;
+        setSide(side);  // 使用setter方法来验证输入
+        setQuantity(quantity);  // 使用setter方法来验证输入
+        this.tradedUnitPrice = tradedUnitPrice;
+        this.inputDatetime = inputDatetime;
+    }
+
+    // Getter 和 Setter 方法
+    public LocalDateTime getTradedDatetime() {
+        return tradedDatetime;
+    }
+
+    public void setTradedDatetime(LocalDateTime tradedDatetime) {
+        validateTradedDatetime(tradedDatetime); // 验证交易时间
+        this.tradedDatetime = tradedDatetime;
+    }
+
+    public String getTicker() {
+        return ticker;
+    }
+
+    public void setTicker(String ticker) {
+        this.ticker = ticker;
+    }
+
+    public String getTickerName() {
+        return tickerName;
+    }
+
+    public void setTickerName(String tickerName) {
+        this.tickerName = tickerName;
+    }
+
+    public String getSide() {
+        return side;
+    }
+
+    public void setSide(String side) {
+        if (isValidSide(side)) {
+            this.side = side;
+        } else {
+            throw new IllegalArgumentException("无效的买卖方向，应为 'Buy' 或 'Sell'");
+        }
+    }
+
+    public int getQuantity() {
+        return quantity;
+    }
+
+    public void setQuantity(int quantity) {
+        if (quantity > 0 && quantity % 100 == 0) { // 假设每笔交易为100股的倍数
+            this.quantity = quantity;
+        } else {
+            throw new IllegalArgumentException("数量必须为正且是100的倍数");
+        }
+    }
+
+    public BigDecimal getTradedUnitPrice() {
+        return tradedUnitPrice;
+    }
+
+    public void setTradedUnitPrice(BigDecimal tradedUnitPrice) {
+        this.tradedUnitPrice = tradedUnitPrice;
+    }
+
+    public LocalDateTime getInputDatetime() {
+        return inputDatetime;
+    }
+
+    public void setInputDatetime(LocalDateTime inputDatetime) {
+        this.inputDatetime = inputDatetime;
+    }
+
+    private boolean isValidSide(String side) {
+        return "Buy".equalsIgnoreCase(side) || "Sell".equalsIgnoreCase(side);
+    }
+
+    public String toCSVFormat() {
+        return String.join(",",
+                tradedDatetime.format(DATETIME_FORMATTER),
+                ticker,
+                tickerName,
+                side,
+                String.valueOf(quantity),
+                tradedUnitPrice.toString(),
+                inputDatetime.format(DATETIME_FORMATTER)
+        );
+    }
+
+    private void validateTradedDatetime(LocalDateTime tradedDatetime) {
+        // 当前时间
+        LocalDateTime now = LocalDateTime.now();
+        
+        // 1. 检查是否为未来的时间
+        if (tradedDatetime.isAfter(now)) {
+            throw new IllegalArgumentException("交易时间不能是未来的时间。");
+        }
+
+        // 2. 检查年份是否大于1878年
+        if (tradedDatetime.getYear() <= 1878) {
+            throw new IllegalArgumentException("年份必须大于1878年。");
+        }
+
+        // 3. 检查是否为工作日（周一至周五）
+        DayOfWeek dayOfWeek = tradedDatetime.getDayOfWeek();
+        if (dayOfWeek == DayOfWeek.SATURDAY || dayOfWeek == DayOfWeek.SUNDAY) {
+            throw new IllegalArgumentException("交易时间必须是工作日（周一至周五）。");
+        }
+
+        // 4. 检查交易时间范围（9:00 - 15:30）
+        LocalTime tradedTime = tradedDatetime.toLocalTime();
+        if (tradedTime.isBefore(LocalTime.of(9, 0)) || tradedTime.isAfter(LocalTime.of(15, 30))) {
+            throw new IllegalArgumentException("交易时间必须在09:00至15:30之间。");
+        }
+    }
+}
+
+
