@@ -727,3 +727,135 @@ public class TradeView {
     }
 }
 
+
+
+追加step4的校验方法
+更新的trade类
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.DayOfWeek;
+
+public class Trade {
+    // Existing fields and methods...
+
+    public static boolean isValidTradeDateTime(LocalDateTime datetime) {
+        LocalDate minDate = LocalDate.of(1878, 1, 1);
+        LocalDateTime now = LocalDateTime.now();
+
+        return !datetime.isBefore(minDate.atStartOfDay()) &&
+               !datetime.isAfter(now) &&
+               datetime.getDayOfWeek().getValue() >= DayOfWeek.MONDAY.getValue() &&
+               datetime.getDayOfWeek().getValue() <= DayOfWeek.FRIDAY.getValue() &&
+               !datetime.toLocalTime().isBefore(LocalTime.of(9, 0)) &&
+               !datetime.toLocalTime().isAfter(LocalTime.of(15, 30));
+    }
+
+    // 新增的売買区分校验
+    public static boolean isValidSide(String side) {
+        return "Buy".equalsIgnoreCase(side) || "Sell".equalsIgnoreCase(side);
+    }
+
+    // 新增的数量校验
+    public static boolean isValidQuantity(int quantity) {
+        return quantity > 0 && quantity % 100 == 0;
+    }
+
+    // 新增的取引単価校验
+    public static boolean isValidTradedUnitPrice(BigDecimal tradedUnitPrice) {
+        return tradedUnitPrice.scale() <= 2;
+    }
+
+    // Other existing methods...
+}
+
+更新的tc类
+public void recordNewTrade() {
+    LocalDateTime tradedDatetime = null;
+    while (true) {
+        try {
+            System.out.print("取引日時を入力してください (yyyy-MM-dd HH:mm): ");
+            tradedDatetime = LocalDateTime.parse(scanner.nextLine().trim(), DATETIME_FORMATTER);
+
+            if (!Trade.isValidTradeDateTime(tradedDatetime)) {
+                System.out.println("無効な取引日時です。1878年以降の平日の9:00〜15:30までの有効な日時を入力してください。");
+                continue;
+            }
+            break;
+        } catch (DateTimeParseException e) {
+            System.out.println("取引日時の形式が正しくありません。再度入力してください。");
+        }
+    }
+
+    String ticker;
+    while (true) {
+        System.out.print("銘柄コードを入力してください (4桁の半角英数字): ");
+        ticker = scanner.nextLine().trim();
+        if (Stock.isValidTicker(ticker)) {
+            break;
+        } else {
+            System.out.println("無効な銘柄コードです。再度入力してください。");
+        }
+    }
+
+    String tickerName;
+    while (true) {
+        System.out.print("銘柄名を入力してください: ");
+        tickerName = scanner.nextLine().trim();
+        if (Stock.isValidProductName(tickerName)) {
+            break;
+        } else {
+            System.out.println("無効な銘柄名です。再度入力してください。");
+        }
+    }
+
+    String side;
+    while (true) {
+        System.out.print("売買区分を入力してください (Buy/Sell): ");
+        side = scanner.nextLine().trim();
+        if (Trade.isValidSide(side)) {
+            break;
+        } else {
+            System.out.println("無効な売買区分です。BuyまたはSellを入力してください。");
+        }
+    }
+
+    int quantity;
+    while (true) {
+        System.out.print("数量を入力してください (100株単位): ");
+        try {
+            quantity = Integer.parseInt(scanner.nextLine().trim());
+            if (Trade.isValidQuantity(quantity)) {
+                break;
+            } else {
+                System.out.println("数量は100の倍数の正の整数を入力してください。");
+            }
+        } catch (NumberFormatException e) {
+            System.out.println("数量の形式が正しくありません。再度入力してください。");
+        }
+    }
+
+    BigDecimal tradedUnitPrice;
+    while (true) {
+        System.out.print("取引単価を入力してください (小数点以下2桁まで): ");
+        try {
+            tradedUnitPrice = new BigDecimal(scanner.nextLine().trim());
+            if (Trade.isValidTradedUnitPrice(tradedUnitPrice)) {
+                break;
+            } else {
+                System.out.println("取引単価は小数点以下2桁以内で入力してください。");
+            }
+        } catch (NumberFormatException e) {
+            System.out.println("取引単価の形式が正しくありません。再度入力してください。");
+        }
+    }
+
+    LocalDateTime inputDatetime = LocalDateTime.now();
+    Trade trade = new Trade(tradedDatetime, ticker, tickerName, side, quantity, tradedUnitPrice, inputDatetime);
+
+    if (tradeRepository.saveTrade(trade)) {
+        tradeView.showTradeAddedMessage(trade);
+    } else {
+        System.out.print("データの書き込みにエラーが発生しました。");
+    }
+}
