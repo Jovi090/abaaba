@@ -1,41 +1,551 @@
+package simplex.bn25.zhao335952.trading;
+
+import simplex.bn25.zhao335952.trading.controller.MainController;
+import simplex.bn25.zhao335952.trading.controller.StockController;
+import simplex.bn25.zhao335952.trading.controller.TradeController;
+import simplex.bn25.zhao335952.trading.model.repository.StockRepository;
+import simplex.bn25.zhao335952.trading.model.repository.TradeRepository;
+import simplex.bn25.zhao335952.trading.view.MenuView;
+import simplex.bn25.zhao335952.trading.view.StockView;
+import simplex.bn25.zhao335952.trading.view.TradeView;
+
+public class Main {
+    public static void main(String[] args) {
+        MenuView menuView = new MenuView();
+        StockView stockView = new StockView();
+        TradeView tradeView = new TradeView();
+
+        String stockCsvFilePath = "C:/Users/qqq/IdeaProjects/untitled/New code/src/csvファイル/Stock.csv";
+        String tradeCsvFilePath = "C:/Users/qqq/IdeaProjects/untitled/New code/src/csvファイル/Trade.csv";
+
+        StockRepository stockRepository = new StockRepository(stockCsvFilePath);
+        TradeRepository tradeRepository = new TradeRepository(tradeCsvFilePath);
+
+        StockController stockController = new StockController(stockRepository, stockView);
+        TradeController tradeController = new TradeController(tradeRepository, tradeView);
+
+        MainController mainController = new MainController(menuView, stockController, tradeController);
+        mainController.start();
+    }
+}
+
+package simplex.bn25.zhao335952.trading.controller;
+
+import simplex.bn25.zhao335952.trading.view.MenuView;
+
+public class MainController {
+    private final MenuView menuView;
+    private final StockController stockController;
+    private final TradeController tradeController;
+
+    public MainController(MenuView menuView, StockController stockController, TradeController tradeController) {
+        this.menuView = menuView;
+        this.stockController = stockController;
+        this.tradeController = tradeController;
+    }
+
+    public void start() {
+        boolean running = true;
+        while (running) {
+            String choice = menuView.displayMainMenu();
+            switch (choice) {
+                case "1" ->{
+                    System.out.println("「銘柄マスタ一覧表示」が選択されました。");
+                    stockController.displayAllStocks();}
+                case "2" ->{
+                    System.out.println("「銘柄マスタ新規登録」が選択されました。");
+                    stockController.addNewStock();}
+                case "3" ->{
+                    System.out.println("「取引新規登録」が選択されました。");
+                    tradeController.recordNewTrade();}
+                case "4" ->{
+                    System.out.println("「取引一覧表示」が選択されました。");
+                    tradeController.displayAllTrades();}
+                case "9" -> {
+                    System.out.println("アプリケーションを終了します。");
+                    running = false;
+                }
+                default ->  System.out.println("対応するメニューは存在しません。");
+            }
+            System.out.println("---");
+        }
+        menuView.close();
+    }
+}
+
+package simplex.bn25.zhao335952.trading.controller;
+
+import simplex.bn25.zhao335952.trading.model.Market;
+import simplex.bn25.zhao335952.trading.model.Stock;
+import simplex.bn25.zhao335952.trading.model.repository.StockRepository;
+import simplex.bn25.zhao335952.trading.view.StockView;
+
+import java.util.List;
+import java.util.Scanner;
+
+public class StockController {
+    private final StockRepository stockRepository;
+    private final StockView stockView;
+    private final Scanner scanner = new Scanner(System.in);
+
+    public StockController(StockRepository stockRepository, StockView stockView) {
+        this.stockRepository = stockRepository;
+        this.stockView = stockView;
+    }
+
+    public void displayAllStocks() {
+        List<Stock> stocks = stockRepository.getAllStocks();
+        stockView.displayStockList(stocks);
+    }
+
+    public void addNewStock() {
+        String ticker = inputTicker();
+        String productName = inputProductName();
+        String market = inputMarket();
+        long sharesIssued = inputSharesIssued();
+
+        Stock stock = new Stock(ticker, productName, market, sharesIssued);
+
+        if (stockRepository.saveStock(stock)) {
+            stockView.showStockAddedMessage(stock);
+        } else {
+            System.out.print("データの書き込みにエラーが発生しました。");
+        }
+    }
+
+    private String inputTicker() {
+        String ticker;
+        while (true) {
+            System.out.print("銘柄コードを入力してください (4桁の半角英数字): ");
+            ticker = scanner.nextLine().trim();
+
+            if (!Stock.isValidTicker(ticker)) {
+                System.out.println("無効な銘柄コードです。再度入力してください。");
+                continue;
+            }
+
+            if (stockRepository.isTickerRegistered(ticker)) {
+                System.out.println("既に登録されている銘柄コードです。再度入力してください。");
+            } else {
+                break;
+            }
+        }
+        return ticker;
+    }
+
+    private String inputProductName() {
+        String productName;
+        while (true) {
+            System.out.print("銘柄名を入力してください: ");
+            productName = scanner.nextLine().trim();
+            if (Stock.isValidProductName(productName)) {
+                break;
+            } else {
+                System.out.println("無効な銘柄名です。再度入力してください。");
+            }
+        }
+        return productName;
+    }
+
+    private String inputMarket() {
+        String market;
+        while (true) {
+            System.out.print("上場市場を入力してください（Prime, Standard, Growth）：");
+            market = scanner.nextLine().trim();
+            if (Market.isValidMarket(market)) {
+                break;
+            } else {
+                System.out.println("無効な上場市場です。再度入力してください。");
+            }
+        }
+        return market;
+    }
+
+    private long inputSharesIssued() {
+        long sharesIssued;
+        while (true) {
+            System.out.print("発行済み株式数を入力してください: ");
+            String input = scanner.nextLine().trim();
+            if (Stock.isValidSharesIssued(input)) {
+                sharesIssued = Long.parseLong(input);
+                break;
+            } else {
+                System.out.println("無効な株式発行数です。1から999999999999の間の整数を入力してください。");
+            }
+        }
+        return sharesIssued;
+    }
+}
+package simplex.bn25.zhao335952.trading.controller;
+
+import simplex.bn25.zhao335952.trading.model.Trade;
+import simplex.bn25.zhao335952.trading.model.repository.TradeRepository;
+import simplex.bn25.zhao335952.trading.view.TradeView;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
+import java.util.List;
+import java.util.Scanner;
+
+public class TradeController {
+    private final TradeRepository tradeRepository;
+    private final TradeView tradeView;
+    private final Scanner scanner = new Scanner(System.in);
+    private static final DateTimeFormatter DATETIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
+    public TradeController(TradeRepository tradeRepository, TradeView tradeView) {
+        this.tradeRepository = tradeRepository;
+        this.tradeView = tradeView;
+    }
+
+    public void displayAllTrades() {
+        List<Trade> trades = tradeRepository.getAllTrades();
+        tradeView.displayTradeList(trades);
+    }
+
+    public void recordNewTrade() {
+        System.out.print("取引日時を入力してください (yyyy-MM-dd HH:mm):");
+        LocalDateTime tradedDatetime = LocalDateTime.parse(scanner.nextLine().trim(), DATETIME_FORMATTER);
+
+        System.out.print("銘柄コードを入力してください (4桁の半角英数字): ");
+        String ticker = scanner.nextLine().trim();
+
+        if (tradeRepository.isTickerRegistered(ticker)) {
+            System.out.println("既に登録されている銘柄コードです。再度入力してください。");
+            return;
+        }
+
+        System.out.print("銘柄名を入力してください: ");
+        String tickerName = scanner.nextLine().trim();
+
+        System.out.print("売買区分を入力してください (Buy/Sell): ");
+        String side = scanner.nextLine().trim();
+
+        System.out.print("数量を入力してください (100株単位):");
+        int quantity = Integer.parseInt(scanner.nextLine().trim());
+
+        System.out.print("取引単価を入力してください (小数点以下2桁まで):");
+        BigDecimal tradedUnitPrice = new BigDecimal(scanner.nextLine().trim());
+
+        LocalDateTime inputDatetime = LocalDateTime.now();
+
+        Trade trade = new Trade(tradedDatetime, ticker, tickerName, side, quantity, tradedUnitPrice, inputDatetime);
+
+        if (tradeRepository.saveTrade(trade)) {
+            tradeView.showTradeAddedMessage(trade);
+        } else {
+            System.out.print("データの書き込みにエラーが発生しました。");
+        }
+    }
+}
+package simplex.bn25.zhao335952.trading.model.repository;
+
+import simplex.bn25.zhao335952.trading.model.Stock;
+import simplex.bn25.zhao335952.trading.model.Market;
+import java.io.*;
+import java.util.ArrayList;
+import java.util.List;
+
+public class StockRepository {
+    private final String csvFilePath;
+
+    public StockRepository(String csvFilePath) {
+        this.csvFilePath = csvFilePath;
+    }
+
+    public List<Stock> getAllStocks() {
+        List<Stock> stocks = new ArrayList<>();
+
+        try (BufferedReader br = new BufferedReader(new FileReader(csvFilePath))) {
+            String line;
+            br.readLine();
+            while ((line = br.readLine()) != null) {
+                String[] fields = line.split(",");
+                if (fields.length == 4) {
+                    String ticker = fields[0].trim();
+                    String productName = fields[1].trim();
+                    String marketString = fields[2].trim();
+                    long sharesIssued = Long.parseLong(fields[3].trim());
+
+                    Market market = Market.fromString(marketString);
+                    Stock stock = new Stock(ticker, productName, market.getSymbol(), sharesIssued);
+                    stocks.add(stock);
+                }
+            }
+        } catch (IOException e) {
+            System.out.println("データの読み込み中にエラーが発生しました。");
+        }
+        return stocks;
+    }
+
+    public boolean saveStock(Stock stock) {
+        try (FileWriter writer = new FileWriter(csvFilePath, true)) {
+            writer.write(String.format("\n%s,%s,%s,%d",
+                    stock.getTicker(),
+                    stock.getProductName(),
+                    stock.getMarket(),
+                    stock.getSharesIssued()));
+            return true;
+        } catch (IOException e) {
+            System.out.println("データの書き込みにエラーが発生しました。");
+            return false;
+        }
+    }
+
+    public boolean isTickerRegistered(String ticker) {
+        try (BufferedReader br = new BufferedReader(new FileReader(csvFilePath))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                String[] fields = line.split(",");
+                if (fields[0].trim().equalsIgnoreCase(ticker)) {
+                    return true;
+                }
+            }
+        } catch (IOException e) {
+            System.out.println("データが見つかりません。新しいCSVファイルを作成します。");
+        }
+        return false;
+    }
+}
+package simplex.bn25.zhao335952.trading.model.repository;
+
+import simplex.bn25.zhao335952.trading.model.Trade;
+
+import java.io.*;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
+
+public class TradeRepository {
+    private final String csvFilePath;
+    private static final DateTimeFormatter DATETIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
+    public TradeRepository(String csvFilePath) {
+        this.csvFilePath = csvFilePath;
+    }
+
+    public List<Trade> getAllTrades() {
+        List<Trade> trades = new ArrayList<>();
+
+        try (BufferedReader br = new BufferedReader(new FileReader(csvFilePath))) {
+            String line;
+            br.readLine();
+            while ((line = br.readLine()) != null) {
+                String[] fields = line.split(",");
+                if (fields.length == 7) {
+                    LocalDateTime tradedDatetime = LocalDateTime.parse(fields[0].trim(), DATETIME_FORMATTER);
+                    String ticker = fields[1].trim();
+                    String tickerName = fields[2].trim();
+                    String side = fields[3].trim();
+                    int quantity = Integer.parseInt(fields[4].trim());
+                    BigDecimal tradedUnitPrice = new BigDecimal(fields[5].trim());
+                    LocalDateTime inputDatetime = LocalDateTime.parse(fields[6].trim(), DATETIME_FORMATTER);
+
+                    Trade trade = new Trade(tradedDatetime, ticker, tickerName, side, quantity, tradedUnitPrice, inputDatetime);
+                    trades.add(trade);
+                }
+            }
+        } catch (IOException e) {
+            System.out.println("データの読み込み中にエラーが発生しました。");
+        }
+
+        return trades;
+    }
+
+    public boolean saveTrade(Trade trade) {
+        try (FileWriter writer = new FileWriter(csvFilePath, true)) {
+            writer.write("\n" + trade.toCSVFormat());
+            return true;
+        } catch (IOException e) {
+            System.out.println("データの書き込み中にエラーが発生しました。");
+            return false;
+        }
+    }
+
+    public boolean isTickerRegistered(String ticker) {
+        try (BufferedReader br = new BufferedReader(new FileReader(csvFilePath))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                String[] fields = line.split(",");
+                if (fields.length > 1 && fields[1].trim().equalsIgnoreCase(ticker)) {
+                    return true;
+                }
+            }
+        } catch (IOException e) {
+            System.out.println("データの読み込み中にエラーが発生しました。");
+        }
+        return false;
+    }
+
+}
+package simplex.bn25.zhao335952.trading.model;
+
+public enum Market {
+    PRIME("P", "Prime"),
+    STANDARD("S", "Standard"),
+    GROWTH("G", "Growth");
+
+    private final String symbol;
+    private final String fullName;
+
+    Market(String symbol, String fullName) {
+        this.symbol = symbol;
+        this.fullName = fullName;
+    }
+
+    public String getSymbol() {
+        return symbol;
+    }
+
+    public String getFullName() {
+        return fullName;
+    }
+
+    public static Market fromString(String market) {
+        String normalizedMarket = market.trim().toLowerCase();
+        return switch (normalizedMarket) {
+            case "prime", "プライム", "p" -> PRIME;
+            case "standard", "スタンダード", "s" -> STANDARD;
+            case "growth", "グロース", "g" -> GROWTH;
+            default -> throw new IllegalArgumentException("無効な上場市場です。");
+        };
+    }
+
+    public static boolean isValidMarket(String market) {
+        try {
+            fromString(market);
+            return true;
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+    }
+}
+package simplex.bn25.zhao335952.trading.model;
+
+public class Stock {
+    private String ticker;
+    private String productName;
+    private Market market;
+    private long sharesIssued;
+
+    public Stock(String ticker, String productName, String market, long sharesIssued) {
+        this.ticker = ticker;
+        this.productName = productName;
+        setMarket(market);
+        this.sharesIssued = sharesIssued;
+    }
+
+    public String getTicker() {
+        return ticker;
+    }
+
+    public void setTicker(String ticker) {
+        if (isValidTicker(ticker)) {
+            this.ticker = ticker;
+        } else {
+            throw new IllegalArgumentException("無効な銘柄コードです。");
+        }
+    }
+
+    public String getProductName() {
+        return productName;
+    }
+
+    public void setProductName(String productName) {
+        if (isValidProductName(productName)) {
+            this.productName = productName;
+        } else {
+            throw new IllegalArgumentException("無効な銘柄名です。");
+        }
+    }
+
+    public String getMarket() {
+        return market.getSymbol();
+    }
+
+    public void setMarket(String market) {
+        this.market = Market.fromString(market);
+    }
+
+    public long getSharesIssued() {
+        return sharesIssued;
+    }
+
+    public void setSharesIssued(long sharesIssued) {
+        if (sharesIssued >= 1 && sharesIssued <= 999999999999L) {
+            this.sharesIssued = sharesIssued;
+        } else {
+            throw new IllegalArgumentException("無効な株式発行数です。1から999999999999の間の整数を入力してください。");
+        }
+    }
+
+    public static boolean isValidTicker(String ticker) {
+        return ticker.matches("^[0-9][ACDFGHJKLMNPRSTUWXYacdfghjklmnprstuwxy0-9][0-9][ACDFGHJKLMNPRSTUWXYacdfghjklmnprstuwxy0-9]$");
+    }
+
+    public static boolean isValidProductName(String productName) {
+        return productName.matches("^[A-Za-z0-9 .()]+$");
+    }
+
+    public static boolean isValidMarket(String market) {
+        String normalizedMarket = market.trim().toLowerCase();
+        return normalizedMarket.equals("prime") ||
+                normalizedMarket.equals("プライム") ||
+                normalizedMarket.equals("standard") ||
+                normalizedMarket.equals("スタンダード") ||
+                normalizedMarket.equals("growth") ||
+                normalizedMarket.equals("グロース");
+    }
+
+    public static boolean isValidSharesIssued(String input) {
+        try {
+            long sharesIssued = Long.parseLong(input);
+            return sharesIssued >= 1 && sharesIssued <= 999999999999L;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
+    public String getMarketFullName() {
+        return market.getFullName();
+    }
+}
+package simplex.bn25.zhao335952.trading.model;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 public class Trade {
-    private LocalDateTime tradedDatetime;  // 交易时间
-    private String ticker;                 // 股票代码
-    private String tickerName;             // 股票名称
-    private String side;                   // 买卖方向（Buy 或 Sell）
-    private int quantity;                  // 交易数量
-    private BigDecimal tradedUnitPrice;    // 交易单价
-    private LocalDateTime inputDatetime;   // 输入时间
+    private LocalDateTime tradedDatetime;
+    private String ticker;
+    private String tickerName;
+    private String side;
+    private int quantity;
+    private BigDecimal tradedUnitPrice;
+    private LocalDateTime inputDatetime;
 
     public static final DateTimeFormatter DATETIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
-    // 构造方法
     public Trade(LocalDateTime tradedDatetime, String ticker, String tickerName, String side, int quantity, BigDecimal tradedUnitPrice, LocalDateTime inputDatetime) {
-        setTradedDatetime(tradedDatetime);
+        this.tradedDatetime = tradedDatetime;
         this.ticker = ticker;
         this.tickerName = tickerName;
         setSide(side);
         setQuantity(quantity);
-        setTradedUnitPrice(tradedUnitPrice);
+        this.tradedUnitPrice = tradedUnitPrice;
         this.inputDatetime = inputDatetime;
     }
 
-    // Getter 和 Setter 方法
     public LocalDateTime getTradedDatetime() {
         return tradedDatetime;
     }
 
     public void setTradedDatetime(LocalDateTime tradedDatetime) {
-        if (isValidDatetime(tradedDatetime)) {
-            this.tradedDatetime = tradedDatetime;
-        } else {
-            throw new IllegalArgumentException("无效的交易时间，请输入1878年之后且不晚于当前时间的有效日期。");
-        }
+        this.tradedDatetime = tradedDatetime;
     }
 
     public String getTicker() {
@@ -62,7 +572,7 @@ public class Trade {
         if (isValidSide(side)) {
             this.side = side;
         } else {
-            throw new IllegalArgumentException("无效的买卖方向，应为 'Buy' 或 'Sell'");
+            throw new IllegalArgumentException("BuyまたはSellを入力してください。");
         }
     }
 
@@ -71,10 +581,10 @@ public class Trade {
     }
 
     public void setQuantity(int quantity) {
-        if (isValidQuantity(quantity)) {
+        if (quantity > 0 && quantity % 100 == 0) { // 假设每笔交易为100股的倍数
             this.quantity = quantity;
         } else {
-            throw new IllegalArgumentException("数量必须为100的整数倍");
+            throw new IllegalArgumentException("100の倍数である数値を入力してください。");
         }
     }
 
@@ -83,11 +593,7 @@ public class Trade {
     }
 
     public void setTradedUnitPrice(BigDecimal tradedUnitPrice) {
-        if (isValidUnitPrice(tradedUnitPrice)) {
-            this.tradedUnitPrice = tradedUnitPrice;
-        } else {
-            throw new IllegalArgumentException("交易单价必须为小数点后最多两位的有效数值");
-        }
+        this.tradedUnitPrice = tradedUnitPrice;
     }
 
     public LocalDateTime getInputDatetime() {
@@ -98,41 +604,10 @@ public class Trade {
         this.inputDatetime = inputDatetime;
     }
 
-    // 验证方法
-
-    // 验证买卖方向
-    public static boolean isValidSide(String side) {
+    private boolean isValidSide(String side) {
         return "Buy".equalsIgnoreCase(side) || "Sell".equalsIgnoreCase(side);
     }
 
-    // 验证交易时间是否在1878年之后且不晚于当前时间
-    public static boolean isValidDatetime(LocalDateTime tradedDatetime) {
-        LocalDateTime minDate = LocalDateTime.of(1878, 1, 1, 0, 0);
-        LocalDateTime now = LocalDateTime.now();
-        return tradedDatetime != null && tradedDatetime.isAfter(minDate) && tradedDatetime.isBefore(now);
-    }
-
-    // 验证日期格式是否正确
-    public static boolean isValidDateFormat(String dateTimeStr) {
-        try {
-            LocalDateTime.parse(dateTimeStr, DATETIME_FORMATTER);
-            return true;
-        } catch (DateTimeParseException e) {
-            return false;
-        }
-    }
-
-    // 验证数量是否为100的倍数
-    public static boolean isValidQuantity(int quantity) {
-        return quantity > 0 && quantity % 100 == 0;
-    }
-
-    // 验证交易单价是否为小数点后最多两位的有效数值
-    public static boolean isValidUnitPrice(BigDecimal tradedUnitPrice) {
-        return tradedUnitPrice != null && tradedUnitPrice.scale() <= 2 && tradedUnitPrice.compareTo(BigDecimal.ZERO) > 0;
-    }
-
-    // 将交易记录转换为CSV格式的字符串
     public String toCSVFormat() {
         return String.join(",",
                 tradedDatetime.format(DATETIME_FORMATTER),
@@ -145,123 +620,110 @@ public class Trade {
         );
     }
 }
+package simplex.bn25.zhao335952.trading.view;
 
-
-
-import model.Trade;
-import model.Stock;
-import model.repository.TradeRepository;
-import view.TradeView;
-
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.Scanner;
 
-public class TradeController {
-    private final TradeRepository tradeRepository;
-    private final TradeView tradeView;
-    private final Scanner scanner = new Scanner(System.in);
+public class MenuView {
+    private final Scanner scanner;
 
-    public TradeController(TradeRepository tradeRepository, TradeView tradeView) {
-        this.tradeRepository = tradeRepository;
-        this.tradeView = tradeView;
+    public MenuView() {
+        scanner = new Scanner(System.in);
     }
 
-    // 记录新交易
-    public void recordNewTrade() {
-        try {
-            LocalDateTime tradedDatetime = inputTradedDatetime();
-            String ticker = inputTicker();
-            String tickerName = inputTickerName();
-            String side = inputSide();
-            int quantity = inputQuantity();
-            BigDecimal tradedUnitPrice = inputTradedUnitPrice();
+    public String displayMainMenu() {
+        System.out.println("操作するメニューを選んでください。");
+        System.out.println("1. 銘柄マスタ一覧表示");
+        System.out.println("2. 銘柄マスタ新規登録");
+        System.out.println("3. 取引新規登録");
+        System.out.println("4. 取引一覧表示");
+        System.out.println("9. アプリケーションを終了する");
+        System.out.print("入力してください: ");
 
-            LocalDateTime inputDatetime = LocalDateTime.now();
-            Trade trade = new Trade(tradedDatetime, ticker, tickerName, side, quantity, tradedUnitPrice, inputDatetime);
+        return scanner.nextLine().trim();
+    }
 
-            if (tradeRepository.saveTrade(trade)) {
-                tradeView.showTradeAddedMessage(trade);
-            } else {
-                System.out.print("データの書き込みにエラーが発生しました。");
+    public void close() {
+        scanner.close();
+    }
+
+}
+package simplex.bn25.zhao335952.trading.view;
+
+import simplex.bn25.zhao335952.trading.model.Stock;
+import java.util.List;
+
+public class StockView {
+
+    public void displayStockList(List<Stock> stocks) {
+        if (stocks.isEmpty()) {
+            System.out.println("データが見つかりません。CSVファイルを確認してください。");
+        } else {
+            System.out.println("------------------------------------------------------------------------");
+            System.out.printf("| %-6s | %-30s | %-8s | %15s |%n", "Ticker", "Product Name", "Market", "Shares Issued");
+            System.out.println("------------------------------------------------------------------------");
+            for (Stock stock : stocks) {
+                displayStock(stock);
             }
-
-        } catch (IllegalArgumentException e) {
-            System.out.println("输入错误：" + e.getMessage());
+            System.out.println("------------------------------------------------------------------------");
         }
     }
 
-    // 输入并验证交易时间
-    private LocalDateTime inputTradedDatetime() {
-        System.out.print("取引日時を入力してください (yyyy-MM-dd HH:mm): ");
-        String dateTimeStr = scanner.nextLine().trim();
-
-        // 检查格式
-        if (!Trade.isValidDateFormat(dateTimeStr)) {
-            throw new IllegalArgumentException("无效的日期格式，应为 yyyy-MM-dd HH:mm");
+    public void displayStock(Stock stock) {
+        String productName = stock.getProductName();
+        if (productName.length() > 30) {
+            productName = productName.substring(0, 27) + "...";
         }
-
-        // 格式正确，解析并验证逻辑
-        LocalDateTime tradedDatetime = LocalDateTime.parse(dateTimeStr, Trade.DATETIME_FORMATTER);
-        if (!Trade.isValidDatetime(tradedDatetime)) {
-            throw new IllegalArgumentException("无效的交易时间");
-        }
-        return tradedDatetime;
+        System.out.printf("| %-6s | %-30s | %-8s | %15s |%n",
+                stock.getTicker().toUpperCase(),
+                productName,
+                stock.getMarketFullName(),
+                formatSharesIssued(stock.getSharesIssued()));
     }
 
-    // 输入并验证股票代码
-    private String inputTicker() {
-        System.out.print("銘柄コードを入力してください (4桁の半角英数字): ");
-        String ticker = scanner.nextLine().trim();
-        if (!Stock.isValidTicker(ticker)) {
-            throw new IllegalArgumentException("无效的股票代码格式");
-        }
-        if (!tradeRepository.isTickerRegistered(ticker)) {
-            throw new IllegalArgumentException("该股票代码未找到，请检查输入或先注册该股票");
-        }
-        return ticker;
+    public void showStockAddedMessage(Stock stock) {
+        System.out.println("銘柄マスタ新規登録しました:" + stock.getProductName());
     }
 
-    // 输入并验证股票名称
-    private String inputTickerName() {
-        System.out.print("銘柄名を入力してください: ");
-        String tickerName = scanner.nextLine().trim();
-        if (!Stock.isValidProductName(tickerName)) {
-            throw new IllegalArgumentException("无效的股票名称格式");
-        }
-        if (!tradeRepository.isTickerRegistered(tickerName)) {
-            throw new IllegalArgumentException("该股票名称未找到，请检查输入或先注册该股票");
-        }
-        return tickerName;
+    private String formatSharesIssued(long sharesIssued) {
+        return String.format("%,d", sharesIssued);
     }
 
-    // 输入并验证买卖方向
-    private String inputSide() {
-        System.out.print("売買区分を入力してください (Buy/Sell): ");
-        String side = scanner.nextLine().trim();
-        if (!Trade.isValidSide(side)) {
-            throw new IllegalArgumentException("无效的买卖方向，应为 'Buy' 或 'Sell'");
+}
+package simplex.bn25.zhao335952.trading.view;
+
+import simplex.bn25.zhao335952.trading.model.Trade;
+import java.util.List;
+
+public class TradeView {
+
+    public void displayTradeList(List<Trade> trades) {
+        if (trades.isEmpty()) {
+            System.out.println("取引データが見つかりません。CSVファイルを確認してください。");
+        } else {
+            System.out.println("-------------------------------------------------------------------------------");
+            System.out.printf("| %-19s | %-6s | %-30s | %-4s | %10s | %10s |%n",
+                    "Datetime","Ticker","Product Name","Side","Quantity","Unit Price");
+            System.out.println("-------------------------------------------------------------------------------");
+            for (Trade trade : trades) {
+                displayTrade(trade);
+            }
+            System.out.println("-------------------------------------------------------------------------------");
         }
-        return side;
     }
 
-    // 输入并验证数量
-    private int inputQuantity() {
-        System.out.print("数量を入力してください (100株単位): ");
-        int quantity = Integer.parseInt(scanner.nextLine().trim());
-        if (!Trade.isValidQuantity(quantity)) {
-            throw new IllegalArgumentException("数量必须为100的整数倍");
-        }
-        return quantity;
+    public void displayTrade(Trade trade) {
+        System.out.printf("| %-19s | %-6s | %-30s | %-4s | %10d | %10.2f |%n",
+                trade.getTradedDatetime().format(Trade.DATETIME_FORMATTER),
+                trade.getTicker().toUpperCase(),
+                trade.getTickerName(),
+                trade.getSide(),
+                trade.getQuantity(),
+                trade.getTradedUnitPrice());
     }
 
-    // 输入并验证交易单价
-    private BigDecimal inputTradedUnitPrice() {
-        System.out.print("取引単価を入力してください (小数点以下2桁まで): ");
-        BigDecimal tradedUnitPrice = new BigDecimal(scanner.nextLine().trim());
-        if (!Trade.isValidUnitPrice(tradedUnitPrice)) {
-            throw new IllegalArgumentException("交易单价必须为小数点后最多两位的有效数值");
-        }
-        return tradedUnitPrice;
+    public void showTradeAddedMessage(Trade trade) {
+        System.out.println("取引データを新規登録しました。" + trade.getTickerName() + " (" + trade.getTicker() + ")");
     }
 }
+
