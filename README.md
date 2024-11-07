@@ -1,158 +1,97 @@
-// 新建 Side.java
-public enum Side {
-    BUY("Buy"),
-    SELL("Sell");
+import simplex.bn25.zhao335952.trading.model.repository.StockRepository;
+import simplex.bn25.zhao335952.trading.model.Stock;
+import simplex.bn25.zhao335952.trading.model.Trade;
+import java.util.List;
 
-    private final String value;
+public class TradeView {
 
-    Side(String value) {
-        this.value = value;
+    private final StockRepository stockRepository;
+
+    // 在构造函数中添加 StockRepository
+    public TradeView(StockRepository stockRepository) {
+        this.stockRepository = stockRepository;
     }
 
-    public String getValue() {
-        return value;
-    }
-
-    // 静态方法用于验证和获取枚举实例
-    public static Side fromString(String side) {
-        for (Side s : Side.values()) {
-            if (s.value.equalsIgnoreCase(side)) {
-                return s;
+    public void displayTradeList(List<Trade> trades) {
+        if (trades.isEmpty()) {
+            System.out.println("取引データが見つかりません。CSVファイルを確認してください。");
+        } else {
+            System.out.println("-------------------------------------------------------------------------------");
+            System.out.printf("| %-19s | %-6s | %-30s | %-4s | %10s | %10s |%n",
+                    "Datetime", "Ticker", "Product Name", "Side", "Quantity", "Unit Price");
+            System.out.println("-------------------------------------------------------------------------------");
+            for (Trade trade : trades) {
+                displayTrade(trade);
             }
+            System.out.println("-------------------------------------------------------------------------------");
         }
-        throw new IllegalArgumentException("無効な売買区分です。BuyまたはSellを入力してください。");
+    }
+
+    public void displayTrade(Trade trade) {
+        // 使用 stockRepository 根据 ticker 获取对应的股票名称
+        String productName = stockRepository.getProductNameByTicker(trade.getTicker());
+        
+        System.out.printf("| %-19s | %-6s | %-30s | %-4s | %10d | %10.2f |%n",
+                trade.getTradedDatetime().format(Trade.DATETIME_FORMATTER),
+                trade.getTicker().toUpperCase(),
+                productName != null ? productName : "N/A",  // 如果找不到名称，显示 "N/A"
+                trade.getSide().getValue(),
+                trade.getQuantity(),
+                trade.getTradedUnitPrice());
     }
 }
 
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-
-public class Trade {
-    private LocalDateTime tradedDatetime;
-    private String ticker;
-    private String tickerName;
-    private Side side;  // 将 side 类型改为 Side 枚举
-    private int quantity;
-    private BigDecimal tradedUnitPrice;
-    private LocalDateTime inputDatetime;
-
-    public static final DateTimeFormatter DATETIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
-
-    public Trade(LocalDateTime tradedDatetime, String ticker, String tickerName, String side, int quantity, BigDecimal tradedUnitPrice, LocalDateTime inputDatetime) {
-        this.tradedDatetime = tradedDatetime;
-        this.ticker = ticker;
-        this.tickerName = tickerName;
-        this.side = Side.fromString(side);  // 使用 Side.fromString 进行验证和赋值
-        this.quantity = quantity;
-        this.tradedUnitPrice = tradedUnitPrice;
-        this.inputDatetime = inputDatetime;
+sr
+public String getProductNameByTicker(String ticker) {
+    List<Stock> stocks = getAllStocks();  // 从 CSV 文件中获取所有股票
+    for (Stock stock : stocks) {
+        if (stock.getTicker().equalsIgnoreCase(ticker)) {
+            return stock.getProductName();
+        }
     }
-
-    public Side getSide() {
-        return side;
-    }
-
-    public void setSide(String side) {
-        this.side = Side.fromString(side);  // 使用 Side.fromString 进行验证和赋值
-    }
-
-    // 其他现有方法保持不变
+    return null;  // 如果找不到对应的股票代码，返回 null
 }
 
-public void recordNewTrade() {
-    LocalDateTime tradedDatetime = null;
-    while (true) {
-        try {
-            System.out.print("取引日時を入力してください (yyyy-MM-dd HH:mm): ");
-            tradedDatetime = LocalDateTime.parse(scanner.nextLine().trim(), DATETIME_FORMATTER);
+// Main.java
 
-            if (!Trade.isValidTradeDateTime(tradedDatetime)) {
-                System.out.println("無効な取引日時です。1878年以降の平日の9:00〜15:30までの有効な日時を入力してください。");
-                continue;
-            }
-            break;
-        } catch (DateTimeParseException e) {
-            System.out.println("取引日時の形式が正しくありません。再度入力してください。");
-        }
+public class Main {
+    public static void main(String[] args) {
+        MenuView menuView = new MenuView();
+        StockView stockView = new StockView();
+        
+        String stockCsvFilePath = "C:/path/to/Stock.csv";
+        String tradeCsvFilePath = "C:/path/to/Trade.csv";
+
+        StockRepository stockRepository = new StockRepository(stockCsvFilePath);  // 初始化 StockRepository
+        TradeRepository tradeRepository = new TradeRepository(tradeCsvFilePath);
+
+        StockController stockController = new StockController(stockRepository, stockView);
+        TradeView tradeView = new TradeView(stockRepository);  // 将 StockRepository 传递给 TradeView
+        TradeController tradeController = new TradeController(tradeRepository, tradeView);
+
+        MainController mainController = new MainController(menuView, stockController, tradeController);
+        mainController.start();
+    }
+}
+
+// TradeController.java
+
+public class TradeController {
+    private final TradeRepository tradeRepository;
+    private final TradeView tradeView;
+
+    public TradeController(TradeRepository tradeRepository, TradeView tradeView) {
+        this.tradeRepository = tradeRepository;
+        this.tradeView = tradeView;
     }
 
-    String ticker;
-    while (true) {
-        System.out.print("銘柄コードを入力してください (4桁の半角英数字): ");
-        ticker = scanner.nextLine().trim();
+    public void displayAllTrades() {
+        List<Trade> trades = tradeRepository.getAllTrades();
 
-        if (!Stock.isValidTicker(ticker)) {
-            System.out.println("無効な銘柄コードです。再度入力してください。");
-            continue;
-        }
+        // 按交易日期降序排序
+        trades.sort(Comparator.comparing(Trade::getTradedDatetime).reversed());
 
-        if (!tradeRepository.isTickerRegistered(ticker)) {
-            System.out.println("銘柄コードが存在しません。再度入力してください。");
-        } else {
-            break;
-        }
-    }
-
-    String tickerName;
-    while (true) {
-        System.out.print("銘柄名を入力してください: ");
-        tickerName = scanner.nextLine().trim();
-        if (Stock.isValidProductName(tickerName)) {
-            break;
-        } else {
-            System.out.println("無効な銘柄名です。再度入力してください。");
-        }
-    }
-
-    Side side;
-    while (true) {
-        System.out.print("売買区分を入力してください (Buy/Sell): ");
-        String inputSide = scanner.nextLine().trim();
-        try {
-            side = Side.fromString(inputSide);  // 使用 Side.fromString 进行验证和赋值
-            break;
-        } catch (IllegalArgumentException e) {
-            System.out.println(e.getMessage());
-        }
-    }
-
-    int quantity;
-    while (true) {
-        System.out.print("数量を入力してください (100株単位): ");
-        try {
-            quantity = Integer.parseInt(scanner.nextLine().trim());
-            if (Trade.isValidQuantity(quantity)) {
-                break;
-            } else {
-                System.out.println("数量は100の倍数の正の整数を入力してください。");
-            }
-        } catch (NumberFormatException e) {
-            System.out.println("数量の形式が正しくありません。再度入力してください。");
-        }
-    }
-
-    BigDecimal tradedUnitPrice;
-    while (true) {
-        System.out.print("取引単価を入力してください (小数点以下2桁まで): ");
-        try {
-            tradedUnitPrice = new BigDecimal(scanner.nextLine().trim());
-            if (Trade.isValidTradedUnitPrice(tradedUnitPrice)) {
-                break;
-            } else {
-                System.out.println("取引単価は小数点以下2桁以内で入力してください。");
-            }
-        } catch (NumberFormatException e) {
-            System.out.println("取引単価の形式が正しくありません。再度入力してください。");
-        }
-    }
-
-    LocalDateTime inputDatetime = LocalDateTime.now();
-    Trade trade = new Trade(tradedDatetime, ticker, tickerName, side.getValue(), quantity, tradedUnitPrice, inputDatetime);
-
-    if (tradeRepository.saveTrade(trade)) {
-        tradeView.showTradeAddedMessage(trade);
-    } else {
-        System.out.print("データの書き込みにエラーが発生しました。");
+        // 显示交易列表
+        tradeView.displayTradeList(trades);
     }
 }
