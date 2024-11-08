@@ -1,35 +1,53 @@
-public void displayTradeList(List<Trade> trades) {
-    if (trades.isEmpty()) {
-        System.out.println("取引データが見つかりません。CSVファイルを確認してください。");
-    } else {
-        System.out.println("-------------------------------------------------------------------------------");
-        System.out.printf("| %-"+WIDTH_DATETIME+"s | %-"+WIDTH_TICKER+"s | %-"+WIDTH_PRODUCT_NAME+"s | %-"+WIDTH_SIDE+"s | %"+WIDTH_QUANTITY+"s | %"+WIDTH_UNIT_PRICE+"s |%n",
-                "Datetime", "Ticker", "Product Name", "Side", "Quantity", "Unit Price");
-        System.out.println("-------------------------------------------------------------------------------");
-        for (Trade trade : trades) {
-            displayTrade(trade);
+import java.time.format.DateTimeParseException;
+
+// 在 TradeController 类中
+private static final DateTimeFormatter DATETIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
+public void recordNewTrade() {
+    LocalDateTime tradedDatetime = null;
+    while (tradedDatetime == null) {
+        try {
+            System.out.print("取引日時を入力してください (yyyy-MM-dd HH:mm): ");
+            String datetimeInput = scanner.nextLine().trim();
+            tradedDatetime = LocalDateTime.parse(datetimeInput, DATETIME_FORMATTER);
+            
+            // 额外检查日期有效性
+            if (tradedDatetime.getDayOfMonth() > tradedDatetime.toLocalDate().lengthOfMonth()) {
+                throw new DateTimeParseException("无效日期", datetimeInput, 0);
+            }
+            
+        } catch (DateTimeParseException e) {
+            System.out.println("無効な日時です。正しい形式で再入力してください。");
         }
-        System.out.println("-------------------------------------------------------------------------------");
+    }
+
+    System.out.print("銘柄コードを入力してください (4桁の半角英数字): ");
+    String ticker = scanner.nextLine().trim();
+
+    if (tradeRepository.isTickerRegistered(ticker)) {
+        System.out.println("既に登録されている銘柄コードです。再度入力してください。");
+        return;
+    }
+
+    System.out.print("銘柄名を入力してください: ");
+    String tickerName = scanner.nextLine().trim();
+
+    System.out.print("売買区分を入力してください (Buy/Sell): ");
+    String side = scanner.nextLine().trim();
+
+    System.out.print("数量を入力してください (100株単位): ");
+    int quantity = Integer.parseInt(scanner.nextLine().trim());
+
+    System.out.print("取引単価を入力してください (小数点以下2桁まで): ");
+    BigDecimal tradedUnitPrice = new BigDecimal(scanner.nextLine().trim());
+
+    LocalDateTime inputDatetime = LocalDateTime.now();
+
+    Trade trade = new Trade(tradedDatetime, ticker, tickerName, side, quantity, tradedUnitPrice, inputDatetime);
+
+    if (tradeRepository.saveTrade(trade)) {
+        tradeView.showTradeAddedMessage(trade);
+    } else {
+        System.out.print("データの書き込みにエラーが発生しました。");
     }
 }
-
-public void displayTrade(Trade trade) {
-    System.out.printf("| %-"+WIDTH_DATETIME+"s | %-"+WIDTH_TICKER+"s | %-"+WIDTH_PRODUCT_NAME+"s | %-"+WIDTH_SIDE+"s | %"+WIDTH_QUANTITY+"d | %"+WIDTH_UNIT_PRICE+".2f |%n",
-            trade.getTradedDatetime().format(Trade.DATETIME_FORMATTER),
-            trade.getTicker().toUpperCase(),
-            trade.getTickerName(),
-            trade.getSide(),
-            trade.getQuantity(),
-            trade.getTradedUnitPrice());
-}
-
-public class TradeView {
-
-    private static final int WIDTH_DATETIME = 19;
-    private static final int WIDTH_TICKER = 6;
-    private static final int WIDTH_PRODUCT_NAME = 30;
-    private static final int WIDTH_SIDE = 4;
-    private static final int WIDTH_QUANTITY = 10;
-    private static final int WIDTH_UNIT_PRICE = 10;
-
-    // other methods...
